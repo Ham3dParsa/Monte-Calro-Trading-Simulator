@@ -128,8 +128,30 @@
     const singleChartControls = document.getElementById('single-chart-controls');
     const mainResetZoomBtn = document.getElementById('main-reset-zoom');
     const singleResetZoomBtn = document.getElementById('single-reset-zoom');
+    const fontSizeToggleBtn = document.getElementById('fontSizeToggle');
 
     const LS_PARAMS_KEY = 'tradingSimParams_v30_final';
+    const LS_FONT_SIZE_KEY = 'tradingSimFontSize_v1';
+    const FONT_SIZE_CLASSES = ['font-size-normal', 'font-size-large', 'font-size-xlarge'];
+
+    function restoreFontSizePreference() {
+        const saved = localStorage.getItem(LS_FONT_SIZE_KEY);
+        if (saved && FONT_SIZE_CLASSES.includes(saved)) {
+            const root = document.documentElement;
+            FONT_SIZE_CLASSES.forEach(cls => root.classList.remove(cls));
+            root.classList.add(saved);
+        }
+    }
+
+    function cycleFontSizePreference() {
+        const root = document.documentElement;
+        const currentIndex = FONT_SIZE_CLASSES.findIndex(cls => root.classList.contains(cls));
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % FONT_SIZE_CLASSES.length;
+        const targetClass = FONT_SIZE_CLASSES[nextIndex];
+        FONT_SIZE_CLASSES.forEach(cls => root.classList.remove(cls));
+        root.classList.add(targetClass);
+        localStorage.setItem(LS_FONT_SIZE_KEY, targetClass);
+    }
 
     function saveParamsToLocalStorage() {
         const paramsToSave = {
@@ -1855,8 +1877,12 @@
     exitFullscreenBtn.addEventListener('click', exitFullscreen);
 
     // --- Initial Setup ---
+    restoreFontSizePreference();
     loadParamsFromLocalStorage();
     populateRankingOptions();
+    if (fontSizeToggleBtn) {
+        fontSizeToggleBtn.addEventListener('click', cycleFontSizePreference);
+    }
     allInputEls.forEach(el => {
         const eventType = (el.tagName === 'INPUT' && el.type === 'number') ? 'input' : 'change';
         el.addEventListener(eventType, saveParamsToLocalStorage);
