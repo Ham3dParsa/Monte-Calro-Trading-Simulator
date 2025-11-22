@@ -1631,24 +1631,48 @@
         const dayOfWeek = date.toLocaleDateString('fa-IR', { weekday: 'long' });
         const fullDate = date.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' });
         let tooltipBodyHtml = '';
+        const MAX_MULTI_TOOLTIP_ROWS = 8;
         if (chart.canvas.id === 'singleSimChart') {
             // --- IMPROVED multi-simulation tooltip logic ---
             if (simulationState.singleChartMode === 'multi') {
                 // Sort the data points from highest balance to lowest
                 const sortedPoints = [...tooltip.dataPoints].sort((a, b) => b.raw - a.raw);
+                const totalPoints = sortedPoints.length;
+                const displayPoints = [];
+                const seenKeys = new Set();
+                const addPoint = (dp) => {
+                    const key = dp.datasetIndex;
+                    if (seenKeys.has(key)) return;
+                    seenKeys.add(key);
+                    displayPoints.push(dp);
+                };
 
-                let listItems = sortedPoints.map((dp, index) => {
+                if (totalPoints > MAX_MULTI_TOOLTIP_ROWS) {
+                    const bestCount = Math.min(3, MAX_MULTI_TOOLTIP_ROWS - 2);
+                    const worstCount = Math.min(2, MAX_MULTI_TOOLTIP_ROWS - bestCount);
+                    sortedPoints.slice(0, bestCount).forEach(addPoint);
+                    sortedPoints.slice(-worstCount).forEach(addPoint);
+                } else {
+                    sortedPoints.forEach(addPoint);
+                }
+
+                const listItems = displayPoints.map((dp, index) => {
                     const simIndex = simulationState.randomSimIndices[dp.datasetIndex];
                     const color = dp.dataset.borderColor;
                     let valueClass = '';
-                    if (index === 0) valueClass = 'text-green-400'; // Highlight the best performer
-                    if (index === sortedPoints.length - 1) valueClass = 'text-red-400'; // Highlight the worst performer
+                    if (index === 0) valueClass = 'text-green-400';
+                    if (index === displayPoints.length - 1 && totalPoints > 1) valueClass = 'text-red-400';
 
                     return `<div class="tooltip-row">
-                                <span style="color: ${color};">&#9632; Sim #${simIndex + 1}</span> 
+                                <span class="tooltip-label" style="color: ${color};">&#9632; Sim #${simIndex + 1}</span>
                                 <span class="tooltip-value ${valueClass}">${formatCurrency(dp.raw)}</span>
                             </div>`;
                 }).join('');
+
+                const hiddenCount = totalPoints - displayPoints.length;
+                const moreRow = hiddenCount > 0
+                    ? `<div class="tooltip-row text-xs text-slate-400" style="justify-content: flex-end;">+${hiddenCount} مسیر دیگر…</div>`
+                    : '';
 
                 // Add a median value for better context
                 const medianValue = getPercentile(sortedPoints.map(dp => dp.raw), 50);
@@ -1657,7 +1681,7 @@
                                         <span class="tooltip-value text-yellow-300">${formatCurrency(medianValue)}</span>
                                     </div>`;
 
-                tooltipBodyHtml = `<div class="multi-sim-list">${listItems}</div>${medianHtml}`;
+                tooltipBodyHtml = `<div class="multi-sim-list">${listItems}${moreRow}</div>${medianHtml}`;
             } else {
                 const simIndex = parseInt(simSelectorEl.value) - 1;
                 const sim = simulationState.allSimulations[simIndex];
