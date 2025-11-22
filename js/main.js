@@ -282,7 +282,9 @@
     function updateSimulationModeUI() {
         const isTradeMode = simulationModeTradesEl.checked;
         tradeTargetGroup.classList.toggle('disabled', !isTradeMode);
+        tradeTargetGroup.classList.toggle('hidden', false);
         durationGroup.classList.toggle('disabled', isTradeMode);
+        durationGroup.classList.toggle('hidden', isTradeMode);
         targetTradesEl.disabled = !isTradeMode;
         showTradeTimeEstimateEl.disabled = !isTradeMode;
         durationValueEl.disabled = isTradeMode;
