@@ -128,7 +128,8 @@
     const singleChartControls = document.getElementById('single-chart-controls');
     const mainResetZoomBtn = document.getElementById('main-reset-zoom');
     const singleResetZoomBtn = document.getElementById('single-reset-zoom');
-    const fontSizeToggleBtn = document.getElementById('fontSizeToggle');
+    const fontSizeIncreaseBtn = document.getElementById('fontSizeIncrease');
+    const fontSizeDecreaseBtn = document.getElementById('fontSizeDecrease');
     const mobileNav = document.getElementById('mobile-bottom-nav');
     const navButtons = document.querySelectorAll('[data-nav-target]');
     const navSections = document.querySelectorAll('[data-nav-section]');
@@ -138,23 +139,50 @@
     const LS_FONT_SIZE_KEY = 'tradingSimFontSize_v1';
     const FONT_SIZE_CLASSES = ['font-size-normal', 'font-size-large', 'font-size-xlarge'];
 
+    function getCurrentFontSizeIndex() {
+        const root = document.documentElement;
+        const body = document.body;
+        return FONT_SIZE_CLASSES.findIndex(cls => root.classList.contains(cls) || body.classList.contains(cls));
+    }
+
+    function applyFontSizeClass(targetClass) {
+        const root = document.documentElement;
+        const body = document.body;
+        FONT_SIZE_CLASSES.forEach(cls => {
+            root.classList.remove(cls);
+            body.classList.remove(cls);
+        });
+        root.classList.add(targetClass);
+        body.classList.add(targetClass);
+        localStorage.setItem(LS_FONT_SIZE_KEY, targetClass);
+    }
+
     function restoreFontSizePreference() {
         const saved = localStorage.getItem(LS_FONT_SIZE_KEY);
         if (saved && FONT_SIZE_CLASSES.includes(saved)) {
-            const root = document.documentElement;
-            FONT_SIZE_CLASSES.forEach(cls => root.classList.remove(cls));
-            root.classList.add(saved);
+            applyFontSizeClass(saved);
+            return;
         }
+
+        const root = document.documentElement;
+        const body = document.body;
+        const defaultClass = FONT_SIZE_CLASSES.find(cls => root.classList.contains(cls)) || FONT_SIZE_CLASSES[0];
+        FONT_SIZE_CLASSES.forEach(cls => body.classList.remove(cls));
+        body.classList.add(defaultClass);
     }
 
-    function cycleFontSizePreference() {
-        const root = document.documentElement;
-        const currentIndex = FONT_SIZE_CLASSES.findIndex(cls => root.classList.contains(cls));
-        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % FONT_SIZE_CLASSES.length;
-        const targetClass = FONT_SIZE_CLASSES[nextIndex];
-        FONT_SIZE_CLASSES.forEach(cls => root.classList.remove(cls));
-        root.classList.add(targetClass);
-        localStorage.setItem(LS_FONT_SIZE_KEY, targetClass);
+    function increaseFontSize() {
+        const currentIndex = getCurrentFontSizeIndex();
+        const startIndex = currentIndex === -1 ? 0 : currentIndex;
+        const nextIndex = Math.min(startIndex + 1, FONT_SIZE_CLASSES.length - 1);
+        applyFontSizeClass(FONT_SIZE_CLASSES[nextIndex]);
+    }
+
+    function decreaseFontSize() {
+        const currentIndex = getCurrentFontSizeIndex();
+        const startIndex = currentIndex === -1 ? 0 : currentIndex;
+        const nextIndex = Math.max(startIndex - 1, 0);
+        applyFontSizeClass(FONT_SIZE_CLASSES[nextIndex]);
     }
 
     function isSectionVisibleForTarget(section, target) {
@@ -1930,8 +1958,11 @@
         });
         window.addEventListener('resize', () => applyNavVisibility(currentNavTarget));
     }
-    if (fontSizeToggleBtn) {
-        fontSizeToggleBtn.addEventListener('click', cycleFontSizePreference);
+    if (fontSizeIncreaseBtn) {
+        fontSizeIncreaseBtn.addEventListener('click', increaseFontSize);
+    }
+    if (fontSizeDecreaseBtn) {
+        fontSizeDecreaseBtn.addEventListener('click', decreaseFontSize);
     }
     allInputEls.forEach(el => {
         const eventType = (el.tagName === 'INPUT' && el.type === 'number') ? 'input' : 'change';
