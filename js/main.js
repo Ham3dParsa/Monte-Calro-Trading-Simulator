@@ -162,6 +162,15 @@
         return keys.includes(target);
     }
 
+    function resizeVisibleCharts() {
+        if (balanceChart && typeof balanceChart.resize === 'function') {
+            balanceChart.resize();
+        }
+        if (singleSimChart && typeof singleSimChart.resize === 'function') {
+            singleSimChart.resize();
+        }
+    }
+
     function applyNavVisibility(target = currentNavTarget) {
         const isMobile = window.matchMedia('(max-width: 768px)').matches;
         currentNavTarget = target;
@@ -176,6 +185,9 @@
             section.classList.toggle('active-mobile', isActive);
             section.style.display = isActive ? '' : 'none';
         });
+
+        // Ensure charts get a resize pass after sections toggle visibility (especially on touch devices)
+        requestAnimationFrame(() => resizeVisibleCharts());
     }
 
     function saveParamsToLocalStorage() {
