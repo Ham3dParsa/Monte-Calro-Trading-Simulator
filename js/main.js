@@ -129,6 +129,10 @@
     const mainResetZoomBtn = document.getElementById('main-reset-zoom');
     const singleResetZoomBtn = document.getElementById('single-reset-zoom');
     const fontSizeToggleBtn = document.getElementById('fontSizeToggle');
+    const mobileNav = document.getElementById('mobile-bottom-nav');
+    const navButtons = document.querySelectorAll('[data-nav-target]');
+    const navSections = document.querySelectorAll('[data-nav-section]');
+    let currentNavTarget = 'config';
 
     const LS_PARAMS_KEY = 'tradingSimParams_v30_final';
     const LS_FONT_SIZE_KEY = 'tradingSimFontSize_v1';
@@ -151,6 +155,27 @@
         FONT_SIZE_CLASSES.forEach(cls => root.classList.remove(cls));
         root.classList.add(targetClass);
         localStorage.setItem(LS_FONT_SIZE_KEY, targetClass);
+    }
+
+    function isSectionVisibleForTarget(section, target) {
+        const keys = (section.dataset.navSection || '').split(',').map(t => t.trim()).filter(Boolean);
+        return keys.includes(target);
+    }
+
+    function applyNavVisibility(target = currentNavTarget) {
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        currentNavTarget = target;
+        navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.navTarget === target));
+        navSections.forEach(section => {
+            if (!isMobile) {
+                section.style.display = '';
+                section.classList.add('active-mobile');
+                return;
+            }
+            const isActive = isSectionVisibleForTarget(section, target);
+            section.classList.toggle('active-mobile', isActive);
+            section.style.display = isActive ? '' : 'none';
+        });
     }
 
     function saveParamsToLocalStorage() {
@@ -1880,6 +1905,19 @@
     restoreFontSizePreference();
     loadParamsFromLocalStorage();
     populateRankingOptions();
+    applyNavVisibility(currentNavTarget);
+    if (navButtons.length) {
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.navTarget || 'config';
+                applyNavVisibility(target);
+                if (target === 'logs' && tradeLogSection) {
+                    tradeLogSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+        window.addEventListener('resize', () => applyNavVisibility(currentNavTarget));
+    }
     if (fontSizeToggleBtn) {
         fontSizeToggleBtn.addEventListener('click', cycleFontSizePreference);
     }
