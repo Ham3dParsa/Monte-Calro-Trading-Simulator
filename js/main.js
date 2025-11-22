@@ -1,10 +1,10 @@
     document.addEventListener('DOMContentLoaded', () => {
     // --- State Management ---
     let simulationState = {
-        isRunning: false, isPaused: false, isComplete: false, allSimulations: [], fullStats: [], params: {}, chartDates: [], singleChartMode: 'single', randomSimIndices: [],
+        isRunning: false, isPaused: false, isComplete: false, allSimulations: [], fullStats: [], params: {}, chartDates: [], singleChartMode: 'single', randomSimIndices: [], maxSimulatedDays: 0,
         candidates: {
             finalBalance: { best: { val: -Infinity, idx: -1 }, worst: { val: Infinity, idx: -1 } },
-            maxDrawdown: { best: { val: Infinity, idx: -1, p: -1 }, worst: { val: -Infinity, idx: -1, p: -1 } }, 
+            maxDrawdown: { best: { val: Infinity, idx: -1, p: -1 }, worst: { val: -Infinity, idx: -1, p: -1 } },
             relativeDdPercent: { best: { val: Infinity, idx: -1 }, worst: { val: -Infinity, idx: -1 } },
             daysInDrawdown: { best: { val: Infinity, idx: -1 }, worst: { val: -Infinity, idx: -1 } },
             maxConsecutiveWins: { best: { val: -Infinity, idx: -1 }, worst: { val: Infinity, idx: -1 } },
@@ -32,6 +32,13 @@
     const minDailyTradesEl = document.getElementById('minDailyTrades');
     const maxDailyTradesEl = document.getElementById('maxDailyTrades');
     const dailyTradesErrorEl = document.getElementById('dailyTradesError');
+    const simulationModeTimeEl = document.getElementById('simulationModeTime');
+    const simulationModeTradesEl = document.getElementById('simulationModeTrades');
+    const tradeTargetGroup = document.getElementById('tradeTargetGroup');
+    const durationGroup = document.getElementById('durationGroup');
+    const targetTradesEl = document.getElementById('targetTrades');
+    const showTradeTimeEstimateEl = document.getElementById('showTradeTimeEstimate');
+    const tradeTimeEstimateEl = document.getElementById('tradeTimeEstimate');
     const durationValueEl = document.getElementById('durationValue');
     const durationUnitEl = document.getElementById('durationUnit');
     const enableWithdrawalsEl = document.getElementById('enableWithdrawals');
@@ -120,7 +127,7 @@
     const mainChartControls = document.getElementById('main-chart-controls');
     const singleChartControls = document.getElementById('single-chart-controls');
 
-    const LS_PARAMS_KEY = 'tradingSimParams_v29_final'; 
+    const LS_PARAMS_KEY = 'tradingSimParams_v30_final';
 
     function saveParamsToLocalStorage() {
         const paramsToSave = {
@@ -128,6 +135,8 @@
             riskType: riskTypeFixedBtn.classList.contains('active') ? 'fixed' : 'compound',
             enableStepUp: enableStepUpEl.checked, stepUpMultiplier: stepUpMultiplierEl.value,
             winRate: winRateEl.value, rrRatioReward: rrRatioRewardEl.value,
+            simulationMode: simulationModeTradesEl.checked ? 'trades' : 'time',
+            targetTrades: targetTradesEl.value, showTradeTimeEstimate: showTradeTimeEstimateEl.checked,
             minDailyTrades: minDailyTradesEl.value, maxDailyTrades: maxDailyTradesEl.value,
             durationValue: durationValueEl.value, durationUnit: durationUnitEl.value,
             enableWithdrawals: enableWithdrawalsEl.checked, withdrawalPeriod: withdrawalPeriodEl.value, withdrawalPercent: withdrawalPercentEl.value,
@@ -166,6 +175,11 @@
         stepUpMultiplierEl.value = savedParams.stepUpMultiplier || '1.5';
         winRateEl.value = savedParams.winRate || '60';
         rrRatioRewardEl.value = savedParams.rrRatioReward || '2.5';
+        const mode = savedParams.simulationMode === 'trades' ? 'trades' : 'time';
+        if (mode === 'trades') { simulationModeTradesEl.checked = true; simulationModeTimeEl.checked = false; }
+        else { simulationModeTimeEl.checked = true; simulationModeTradesEl.checked = false; }
+        targetTradesEl.value = savedParams.targetTrades || '500';
+        showTradeTimeEstimateEl.checked = savedParams.showTradeTimeEstimate || false;
         minDailyTradesEl.value = savedParams.minDailyTrades || '0';
         maxDailyTradesEl.value = savedParams.maxDailyTrades || '5';
         durationValueEl.value = savedParams.durationValue || '12';
@@ -196,10 +210,19 @@
         // Handle the new default for lot cap
         enableLotCapEl.checked = typeof savedParams.enableLotCap === 'boolean' ? savedParams.enableLotCap : true;
         maxLotAllowedEl.value = savedParams.maxLotAllowed || '100';
-        updateRiskTypeUI(); updateDailyLimitsUI(); updateExecutionSettingsUI(); updateSimulationsLimit();
+        updateRiskTypeUI(); updateDailyLimitsUI(); updateExecutionSettingsUI(); updateSimulationsLimit(); updateSimulationModeUI();
+        updateTradeTimeEstimate();
     }
     
     function updateSimulationsLimit() {
+        if (simulationModeTradesEl.checked) {
+            const maxSims = 3500;
+            numSimulationsEl.max = maxSims;
+            simulationsWarningEl.textContent = `حداکثر تعداد مجاز در حالت معاملات: ${maxSims}`;
+            simulationsTooltipEl.innerHTML = `تعداد بالاتر نتایج آماری دقیق‌تری می‌دهد اما زمان بیشتری می‌برد. <br><strong>توصیه می‌شود حدود ۵۰۰ انتخاب شود.</strong>`;
+            if (parseInt(numSimulationsEl.value) > maxSims) numSimulationsEl.value = maxSims;
+            return;
+        }
         const durationVal = parseInt(durationValueEl.value);
         const durationUnit = durationUnitEl.value;
         const totalYears = durationUnit === 'years' ? durationVal : durationVal / 12;
@@ -223,6 +246,10 @@
         const maxTrades = parseInt(maxDailyTradesEl.value);
         if (minTrades > maxTrades) {
             isValid = false; minDailyTradesEl.classList.add('invalid'); maxDailyTradesEl.classList.add('invalid'); dailyTradesErrorEl.style.display = 'block';
+        }
+        if (simulationModeTradesEl.checked) {
+            const targetTrades = parseInt(targetTradesEl.value);
+            if (!targetTrades || targetTrades <= 0) { isValid = false; targetTradesEl.classList.add('invalid'); }
         }
         if (enableLotCalculationEl.checked) {
             const minSL = parseInt(minStopLossPointsEl.value); const maxSL = parseInt(maxStopLossPointsEl.value);
@@ -252,6 +279,60 @@
         dailyLimitBasisGroupEl.classList.toggle('disabled', !anyPercentLimitEnabled);
     }
 
+    function updateSimulationModeUI() {
+        const isTradeMode = simulationModeTradesEl.checked;
+        tradeTargetGroup.classList.toggle('disabled', !isTradeMode);
+        durationGroup.classList.toggle('disabled', isTradeMode);
+        targetTradesEl.disabled = !isTradeMode;
+        showTradeTimeEstimateEl.disabled = !isTradeMode;
+        durationValueEl.disabled = isTradeMode;
+        durationUnitEl.disabled = isTradeMode;
+        if (!isTradeMode) {
+            tradeTimeEstimateEl.classList.add('hidden');
+        }
+    }
+
+    function updateTradeTimeEstimate() {
+        if (!simulationModeTradesEl.checked || !showTradeTimeEstimateEl.checked) {
+            tradeTimeEstimateEl.classList.add('hidden');
+            tradeTimeEstimateEl.textContent = '';
+            return;
+        }
+        const target = parseInt(targetTradesEl.value);
+        const minTrades = Math.max(0, parseInt(minDailyTradesEl.value));
+        const maxTrades = Math.max(0, parseInt(maxDailyTradesEl.value));
+        if (!target || target <= 0) {
+            tradeTimeEstimateEl.classList.remove('hidden');
+            tradeTimeEstimateEl.textContent = 'برای تخمین، تعداد معاملات هدف را تعیین کنید.';
+            return;
+        }
+        if (minTrades === 0 && maxTrades === 0) {
+            tradeTimeEstimateEl.classList.remove('hidden');
+            tradeTimeEstimateEl.textContent = 'برای تخمین زمان، حداقل یکی از مقادیر معاملات روزانه را بیشتر از صفر کنید.';
+            return;
+        }
+        const avgTrades = (minTrades + maxTrades) / 2;
+        const minDays = maxTrades > 0 ? target / maxTrades : null;
+        const maxDays = minTrades > 0 ? target / minTrades : null;
+        const avgDays = avgTrades > 0 ? target / avgTrades : null;
+
+        const formatDays = (val) => {
+            if (val === null || !isFinite(val)) return '-';
+            const days = Math.ceil(val);
+            const weeks = (days / 7).toFixed(1);
+            const months = (days / 30).toFixed(1);
+            return `${days} روز (حدود ${weeks} هفته / ${months} ماه)`;
+        };
+
+        const parts = [];
+        if (minDays !== null) parts.push(`حداقل ≈ ${formatDays(minDays)}`);
+        if (maxDays !== null) parts.push(`حداکثر ≈ ${formatDays(maxDays)}`);
+        if (avgDays !== null) parts.push(`میانگین ≈ ${formatDays(avgDays)}`);
+
+        tradeTimeEstimateEl.classList.remove('hidden');
+        tradeTimeEstimateEl.innerHTML = `برای ${target.toLocaleString('fa-IR')} معامله تقریبی: ${parts.join(' | ')}`;
+    }
+
     function updateExecutionSettingsUI() {
         const isEnabled = enableLotCalculationEl.checked;
         executionSettingsEl.classList.toggle('disabled', !isEnabled);
@@ -266,6 +347,11 @@
         saveParamsToLocalStorage();
     });
     enableLotCapEl.addEventListener('change', updateExecutionSettingsUI);
+    simulationModeTimeEl.addEventListener('change', () => { updateSimulationModeUI(); updateSimulationsLimit(); updateTradeTimeEstimate(); saveParamsToLocalStorage(); });
+    simulationModeTradesEl.addEventListener('change', () => { updateSimulationModeUI(); updateSimulationsLimit(); updateTradeTimeEstimate(); saveParamsToLocalStorage(); });
+    targetTradesEl.addEventListener('input', () => { updateTradeTimeEstimate(); saveParamsToLocalStorage(); });
+    showTradeTimeEstimateEl.addEventListener('change', () => { updateTradeTimeEstimate(); saveParamsToLocalStorage(); });
+    [minDailyTradesEl, maxDailyTradesEl].forEach(el => el.addEventListener('input', () => { updateTradeTimeEstimate(); }));
     riskTypeCompoundBtn.addEventListener('click', () => { riskTypeCompoundBtn.classList.add('active'); riskTypeFixedBtn.classList.remove('active'); updateRiskTypeUI(); });
     riskTypeFixedBtn.addEventListener('click', () => { riskTypeFixedBtn.classList.add('active'); riskTypeCompoundBtn.classList.remove('active'); updateRiskTypeUI(); });
     dailyLimitBasisFloatingBtn.addEventListener('click', () => { dailyLimitBasisFloatingBtn.classList.add('active'); dailyLimitBasisInitialBtn.classList.remove('active'); });
@@ -464,7 +550,7 @@
         }
         const oldParams = simulationState.params;
         simulationState = {
-            isRunning: false, isPaused: false, isComplete: false, allSimulations: [], fullStats: [], params: isSoft ? oldParams : {}, chartDates: [], singleChartMode: 'single', randomSimIndices: [],
+            isRunning: false, isPaused: false, isComplete: false, allSimulations: [], fullStats: [], params: isSoft ? oldParams : {}, chartDates: [], singleChartMode: 'single', randomSimIndices: [], maxSimulatedDays: 0,
             candidates: {
                 finalBalance: { best: { val: -Infinity, idx: -1 }, worst: { val: Infinity, idx: -1 } },
                 maxDrawdown: { best: { val: Infinity, idx: -1, p: -1 }, worst: { val: -Infinity, idx: -1, p: -1 } },
@@ -519,6 +605,7 @@
     }
 
     function collectParams() {
+        const simulationMode = simulationModeTradesEl.checked ? 'trades' : 'time';
         const durationVal = parseInt(durationValueEl.value);
         const durationUnit = durationUnitEl.value;
         const totalMonths = durationUnit === 'years' ? durationVal * 12 : durationVal;
@@ -526,7 +613,16 @@
         let endDate = new Date(startDate);
         if (durationUnit === 'years') endDate.setFullYear(endDate.getFullYear() + durationVal);
         else endDate.setMonth(endDate.getMonth() + durationVal);
-        const totalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        const timeModeTotalDays = Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        const minTrades = parseInt(minDailyTradesEl.value);
+        const maxTrades = parseInt(maxDailyTradesEl.value);
+        const targetTrades = parseInt(targetTradesEl.value) || 0;
+        const tradeModeDays = simulationMode === 'trades'
+            ? calculateTradeModeDays(targetTrades, minTrades, maxTrades)
+            : timeModeTotalDays;
+        const effectiveTotalDays = simulationMode === 'trades' ? tradeModeDays : timeModeTotalDays;
+        const effectiveTotalMonths = simulationMode === 'trades' ? Math.max(1, Math.ceil(effectiveTotalDays / 30.44)) : totalMonths;
         
         let seed = simulationSeedEl.value.trim();
         if (!preserveSeedEl.checked || seed === '' || isNaN(parseInt(seed))) {
@@ -537,10 +633,10 @@
         simulationState.params = {
             initialBalance: parseFloat(initialBalanceEl.value), riskPercent: parseFloat(riskPercentEl.value) / 100, isCompound: riskTypeCompoundBtn.classList.contains('active'),
             stepUpEnabled: enableStepUpEl.checked, stepUpMultiplier: parseFloat(stepUpMultiplierEl.value), rrRatio: parseFloat(rrRatioRewardEl.value),
-            winRate: parseFloat(winRateEl.value) / 100, minTrades: parseInt(minDailyTradesEl.value), maxTrades: parseInt(maxDailyTradesEl.value),
+            winRate: parseFloat(winRateEl.value) / 100, minTrades, maxTrades,
             withdrawEnabled: enableWithdrawalsEl.checked, withdrawalPeriodWeeks: parseInt(withdrawalPeriodEl.value), withdrawalPercent: parseFloat(withdrawalPercentEl.value) / 100,
-            usdToIrt: parseFloat(usdToIrtEl.value), numSimulations: parseInt(numSimulationsEl.value), totalMonths, totalDays, startDate: startDate.toISOString(),
-            seed: parseInt(seed),
+            usdToIrt: parseFloat(usdToIrtEl.value), numSimulations: parseInt(numSimulationsEl.value), totalMonths: effectiveTotalMonths, totalDays: effectiveTotalDays, startDate: startDate.toISOString(),
+            seed: parseInt(seed), simulationMode, targetTrades, tradeModeMaxDays: tradeModeDays,
             enableMaxDailySL: enableMaxDailySLEl.checked, maxDailySL: parseInt(maxDailySLEl.value), enableMaxDailyTP: enableMaxDailyTPEl.checked, maxDailyTP: parseInt(maxDailyTPEl.value),
             enableDailyLossLimit: enableDailyLossLimitEl.checked, dailyLossLimit: parseFloat(dailyLossLimitEl.value), enableDailyProfitTarget: enableDailyProfitTargetEl.checked, dailyProfitTarget: parseFloat(dailyProfitTargetEl.value),
             dailyLimitBasis: dailyLimitBasisFloatingBtn.classList.contains('active') ? 'floating' : 'initial', enableLotCalculation: enableLotCalculationEl.checked,
@@ -548,7 +644,7 @@
             assetType: assetTypeEl.value, minStopLossPoints: parseFloat(minStopLossPointsEl.value), maxStopLossPoints: parseFloat(maxStopLossPointsEl.value),
             contractSize: parseFloat(contractSizeEl.value), commissionPerLot: parseFloat(commissionPerLotEl.value),
         };
-        simulationState.chartDates = generateAllDates(startDate, totalDays);
+        simulationState.chartDates = generateAllDates(startDate, effectiveTotalDays);
     }
 
     // --- Result Processing and Display ---
@@ -574,6 +670,8 @@
             const stats = calculatePeriodStats(sim, sim.balances.length - 1, false);
             return { ...stats, index };
         });
+
+        simulationState.maxSimulatedDays = Math.max(...simulationState.allSimulations.map(sim => (sim.balances?.length || 1) - 1));
         
         simulationState.currentRankingStats = simulationState.fullStats; // <-- داده‌های اولیه را در حافظه ذخیره می‌کنیم
 
@@ -641,7 +739,7 @@
 
     function renderOverallStats() {
         if (!simulationState.isComplete) return;
-        
+
         const percentileHtml = (title, key, unit) => {
             const higherIsBetter = metricProperties[key].higherIsBetter;
             const allValues = simulationState.fullStats.map(s => s[key]).sort((a,b) => a-b);
@@ -697,7 +795,22 @@
             ${candidateHtml('کاندیدا: بیشترین باخت‌های پیاپی', candidates.maxConsecutiveLosses.best.idx, candidates.maxConsecutiveLosses.worst.idx, 'کمترین', 'بیشترین')}
         `;
 
+        const modeInfo = (() => {
+            if (simulationState.params.simulationMode !== 'trades') return '';
+            const tradesExecuted = getPercentile(simulationState.fullStats.map(s => s.totalTradesSimulated ?? s.periodTotalTrades).sort((a,b) => a-b), 50);
+            const daysElapsed = getPercentile(simulationState.allSimulations.map(s => s.simulatedDays ?? (s.balances.length - 1)).sort((a,b) => a-b), 50);
+            return `<div class="bg-slate-800 p-4 rounded-lg border border-slate-700 mb-4">
+                <div class="text-cyan-300 font-semibold mb-2">حالت معاملات (بر اساس تعداد)</div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-slate-200">
+                    <div class="flex justify-between"><span>هدف معاملات:</span><b>${simulationState.params.targetTrades.toLocaleString('fa-IR')}</b></div>
+                    <div class="flex justify-between"><span>میانه معاملات انجام شده:</span><b>${tradesExecuted.toFixed(0)}</b></div>
+                    <div class="flex justify-between"><span>میانه روزهای طی شده:</span><b>${Math.round(daysElapsed)}</b></div>
+                </div>
+            </div>`;
+        })();
+
         overallStatsInfo.innerHTML = `
+            ${modeInfo}
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 ${percentileHtml('نرخ برد واقعی', 'winRate', '%')}
                 ${percentileHtml('فاکتور سود', 'profitFactor', '')}
@@ -730,10 +843,11 @@
     function renderChart() {
         if (!simulationState.isComplete) return;
         const activeTab = document.querySelector('#chart-tabs .tab-btn.active');
-        const numDays = activeTab ? parseInt(activeTab.dataset.period) : simulationState.params.totalDays;
+        const maxAvailableDays = simulationState.maxSimulatedDays || simulationState.params.totalDays;
+        const numDays = activeTab ? Math.min(parseInt(activeTab.dataset.period), maxAvailableDays) : maxAvailableDays;
         const dailyPercentiles = { p25: [], p50: [], p75: [] };
         for (let day = 0; day <= numDays; day++) {
-            const balancesOnDay = simulationState.allSimulations.map(s => s.balances[day]).sort((a,b) => a-b);
+            const balancesOnDay = simulationState.allSimulations.map(s => s.balances[Math.min(day, s.balances.length - 1)] ?? s.balances[s.balances.length - 1]).sort((a,b) => a-b);
             dailyPercentiles.p25.push(getPercentile(balancesOnDay, 25));
             dailyPercentiles.p50.push(getPercentile(balancesOnDay, 50));
             dailyPercentiles.p75.push(getPercentile(balancesOnDay, 75));
@@ -758,7 +872,8 @@
     function renderSingleSimulationChart() {
         if (!simulationState.isComplete) return;
         const activeTab = document.querySelector('#single-sim-chart-tabs .tab-btn.active');
-        const numDays = activeTab ? parseInt(activeTab.dataset.period) : simulationState.params.totalDays;
+        const maxAvailableDays = simulationState.maxSimulatedDays || simulationState.params.totalDays;
+        const numDays = activeTab ? Math.min(parseInt(activeTab.dataset.period), maxAvailableDays) : maxAvailableDays;
         const periodLabel = activeTab ? activeTab.dataset.label : 'کل دوره';
         const labels = simulationState.chartDates.slice(0, numDays + 1);
         let datasets = [];
@@ -774,14 +889,14 @@
         if (simulationState.singleChartMode === 'multi') {
             if (simulationState.randomSimIndices.length === 0) {
                 // Default to 10 if none are selected yet
-                showMultiSimView(10); 
+                showMultiSimView(10);
                 return; // The function will be called again with the right data
             }
             datasets = simulationState.randomSimIndices.map(index => {
                 const simData = simulationState.allSimulations[index];
                 return {
                     label: `شبیه‌سازی #${index + 1}`,
-                    data: simData.balances.slice(0, numDays + 1),
+                    data: Array.from({ length: numDays + 1 }, (_, i) => simData.balances[Math.min(i, simData.balances.length - 1)]),
                     borderColor: getRandomColor(),
                     borderWidth: 1.5,
                     fill: false,
@@ -799,12 +914,13 @@
             const stats = calculatePeriodStats(simData, numDays, false, periodLabel);
             if (!stats) return;
 
-            const mainData = simData.balances.slice(0, numDays + 1);
+            const mainData = Array.from({ length: numDays + 1 }, (_, i) => simData.balances[Math.min(i, simData.balances.length - 1)]);
             const peakLine = [];
             let currentPeak = -Infinity;
             for(let i=0; i < mainData.length; i++) {
-                if (simData.balancesWithoutWithdrawals[i] > currentPeak) {
-                    currentPeak = simData.balancesWithoutWithdrawals[i];
+                const balanceValue = simData.balancesWithoutWithdrawals[Math.min(i, simData.balancesWithoutWithdrawals.length - 1)];
+                if (balanceValue > currentPeak) {
+                    currentPeak = balanceValue;
                 }
                 peakLine.push(currentPeak);
             }
@@ -890,6 +1006,9 @@
                     <div class="flex justify-between"><span>معاملات بازنده:</span> <b class="text-red-400">${formatAvg(stats.periodTotalLosses)}</b></div>
                     <div class="flex justify-between"><span>نرخ برد واقعی:</span> <b>${stats.winRate.toFixed(2)}%</b></div>
                     <div class="flex justify-between"><span>فاکتور سود:</span> <b class="${stats.profitFactor >= 1 ? 'text-green-400' : 'text-red-400'}">${stats.profitFactor.toFixed(2)}</b></div>
+                    ${p.simulationMode === 'trades' ? `<div class="flex justify-between"><span>هدف معاملات:</span> <b>${p.targetTrades.toLocaleString('fa-IR')}</b></div>
+                    <div class="flex justify-between"><span>معاملات اجرا شده:</span> <b>${formatAvg(stats.totalTradesSimulated ?? stats.periodTotalTrades)}</b></div>
+                    <div class="flex justify-between"><span>روزهای شبیه‌سازی شده:</span> <b>${formatAvg(stats.simulatedDays ?? stats.periodCalendarDays)}</b></div>` : ''}
                 </div>
                 <div class="bg-slate-800 p-4 rounded-lg space-y-2">
                     <h4 class="font-bold text-cyan-500 text-center mb-2">آمار زمانی</h4>
@@ -985,7 +1104,7 @@
         resultsTableBody.innerHTML = '';
         if (!simulationState.isComplete) return;
         const p = simulationState.params;
-        const dayIndex = Math.min(periodInDays, p.totalDays);
+        const dayIndex = Math.min(periodInDays, p.totalDays, simulationState.maxSimulatedDays || p.totalDays);
         const scenarios = [
             { label: 'خوش‌بینانه (P75)', percentile: 75 },
             { label: 'واقع‌بینانه (P50)', percentile: 50 },
@@ -1178,10 +1297,10 @@
             const indices = simulationState.singleChartMode === 'multi' ? simulationState.randomSimIndices : Array.from(Array(simulationState.allSimulations.length).keys());
             if (indices.length === 0) return {};
             const avgKeys = [
-                'finalBalance', 'finalBalanceWithoutWithdrawals', 'peakBalance', 'minBalance', 'maxDrawdown', 'maxDrawdownPercent', 
-                'relativeDrawdown', 'relativeDdPercent', 'profitFactor', 'periodTotalWins', 'periodTotalLosses', 
-                'periodTotalTrades', 'grossProfit', 'grossLoss', 'totalCommission', 'maxConsecutiveWins', 'maxConsecutiveLosses', 
-                'maxDailyDrawdownDynamicPercent', 'periodTradingDaysCount', 'periodActiveTradingDays', 'daysInDrawdown', 'daysInDdFromPeak', 'maxDdStreak',
+                'finalBalance', 'finalBalanceWithoutWithdrawals', 'peakBalance', 'minBalance', 'maxDrawdown', 'maxDrawdownPercent',
+                'relativeDrawdown', 'relativeDdPercent', 'profitFactor', 'periodTotalWins', 'periodTotalLosses',
+                'periodTotalTrades', 'grossProfit', 'grossLoss', 'totalCommission', 'maxConsecutiveWins', 'maxConsecutiveLosses',
+                'maxDailyDrawdownDynamicPercent', 'periodTradingDaysCount', 'periodActiveTradingDays', 'daysInDrawdown', 'daysInDdFromPeak', 'maxDdStreak', 'totalTradesSimulated', 'simulatedDays',
                 'slLimitHitCount', 'tpLimitHitCount', 'lossLimitHitCount', 'profitTargetHitCount', 'totalWithdrawals'
             ];
             let avgStats = Object.fromEntries(avgKeys.map(k => [k, 0]));
@@ -1223,15 +1342,17 @@
             avgStats.profitTargetHitPercent = avgStats.periodTradingDaysCount > 0 ? (avgStats.profitTargetHitCount / avgStats.periodTradingDaysCount * 100) : 0;
             avgStats.periodLabel = periodLabel;
             avgStats.periodCalendarDays = endDateIndex;
+            avgStats.simulatedDays = avgStats.simulatedDays / count;
             // --- ADD THESE TWO LINES AFTER IT ---
             avgStats.maxWinStreakDetails.pnl /= count;
             avgStats.maxLossStreakDetails.pnl /= count;
             // --- END OF ADDITION ---
             return avgStats;
         }
-        const performanceBalances = simData.balancesWithoutWithdrawals.slice(0, endDateIndex + 1);
-        const finalBalance = simData.balances[endDateIndex];
-        const finalBalanceWithoutWithdrawals = performanceBalances[endDateIndex];
+        const safeEndDateIndex = Math.min(endDateIndex, simData.balances.length - 1);
+        const performanceBalances = simData.balancesWithoutWithdrawals.slice(0, safeEndDateIndex + 1);
+        const finalBalance = simData.balances[safeEndDateIndex];
+        const finalBalanceWithoutWithdrawals = performanceBalances[Math.min(endDateIndex, performanceBalances.length - 1)];
         const totalProfit = finalBalance - initialBalance;
         const totalProfitPercent = initialBalance > 0 ? (totalProfit / initialBalance) * 100 : 0;
         let peak = -Infinity, maxDd = 0;
@@ -1246,11 +1367,11 @@
         const maxDdPercent = peak > 0 ? (maxDd / peak) * 100 : 0;
         const relativeDd = Math.max(0, initialBalance - minBalanceVal);
         const relativeDdPercent = initialBalance > 0 ? (relativeDd / initialBalance) * 100 : 0;
-        const periodEvents = simData.eventLog.filter(e => e.dayIndex <= endDateIndex);
+        const periodEvents = simData.eventLog.filter(e => e.dayIndex <= safeEndDateIndex);
         
         let periodTradingDaysCount = 0;
         const startDate = new Date(p.startDate);
-        for(let i=1; i <= endDateIndex; i++){
+        for(let i=1; i <= safeEndDateIndex; i++){
             let currentDate = new Date(startDate);
             currentDate.setDate(startDate.getDate() + i);
             const dayOfWeek = currentDate.getDay();
@@ -1272,7 +1393,7 @@
         
         const daysInDrawdown = performanceBalances.filter(b => b < initialBalance).length;
 
-        const dailyDds = simData.dailyDrawdowns.filter(d => d.dayIndex <= endDateIndex);
+        const dailyDds = simData.dailyDrawdowns.filter(d => d.dayIndex <= safeEndDateIndex);
         let maxDailyDrawdownDynamicPercent = 0;
         dailyDds.forEach(d => { if (d.base > 0) { const percent = (d.dd / d.base) * 100; if (percent > maxDailyDrawdownDynamicPercent) maxDailyDrawdownDynamicPercent = percent; } });
         
@@ -1289,7 +1410,7 @@
             periodTotalTrades: totalTradesInPeriod, periodTotalWins: periodWins, periodTotalLosses: periodLosses,
             grossProfit: periodGrossProfit, grossLoss: periodGrossLoss, totalCommission,
             totalWithdrawals: totalWithdrawalsInPeriod,
-            periodCalendarDays: endDateIndex, periodTradingDaysCount, periodActiveTradingDays,
+            periodCalendarDays: safeEndDateIndex, periodTradingDaysCount, periodActiveTradingDays,
             
             // Corrected data passing:
             daysInDrawdown: simData.daysInDrawdown, 
@@ -1304,7 +1425,10 @@
             tpLimitHitPercent: periodTradingDaysCount > 0 ? (tpLimitHitCount / periodTradingDaysCount * 100) : 0,
             lossLimitHitPercent: periodTradingDaysCount > 0 ? (lossLimitHitCount / periodTradingDaysCount * 100) : 0,
             profitTargetHitPercent: periodTradingDaysCount > 0 ? (profitTargetHitCount / periodTradingDaysCount * 100) : 0,
-            periodLabel
+            periodLabel,
+            totalTradesSimulated: simData.totalTradesSimulated ?? totalTradesInPeriod,
+            simulatedDays: simData.simulatedDays ?? safeEndDateIndex,
+            tradeTarget: p.targetTrades
         };
     }
     
@@ -1353,6 +1477,13 @@
             dates.push(nextDate);
         }
         return dates;
+    }
+    function calculateTradeModeDays(targetTrades, minTrades, maxTrades) {
+        const positiveTarget = Math.max(1, targetTrades);
+        const dailyCapacity = Math.max(1, Math.max(minTrades || 0, maxTrades || 0));
+        const estimatedDays = Math.ceil(positiveTarget / dailyCapacity);
+        const buffer = Math.max(30, Math.ceil(estimatedDays * 0.2));
+        return estimatedDays + buffer;
     }
     function generateDynamicTimeTabs() {
         const totalDays = simulationState.params.totalDays;

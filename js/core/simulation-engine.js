@@ -2,8 +2,14 @@ import { createPRNG } from './prng.js';
 
 export function runSingleSimulation(p, simIndex) {
             // Use the seeded random function
-            const random = createPRNG(p.seed + simIndex); 
-            
+            const random = createPRNG(p.seed + simIndex);
+
+            const isTradeMode = p.simulationMode === 'trades';
+            const tradeTarget = Math.max(0, p.targetTrades || 0);
+            const plannedDays = Math.max(1, isTradeMode ? (p.tradeModeMaxDays || p.totalDays) : p.totalDays);
+            let simulatedDaysElapsed = 0;
+            let targetReached = false;
+
             let balance = p.initialBalance;
             let balanceWithoutWithdrawals = p.initialBalance;
             let riskBase = p.initialBalance;
@@ -38,10 +44,10 @@ export function runSingleSimulation(p, simIndex) {
             
             const startDate = new Date(p.startDate);
 
-            for (let dayIndex = 1; dayIndex <= p.totalDays; dayIndex++) {
+            for (let dayIndex = 1; dayIndex <= plannedDays; dayIndex++) {
                 let currentDate = new Date(startDate);
                 currentDate.setDate(startDate.getDate() + dayIndex);
-                
+
                 const dayOfWeek = currentDate.getDay();
                 const isWeekend = (dayOfWeek === 6) || (dayOfWeek === 0);
                 
@@ -55,11 +61,20 @@ export function runSingleSimulation(p, simIndex) {
                     const startOfDayBalance = balanceWithoutWithdrawals;
                     let minBalanceDuringDay = startOfDayBalance;
                     
+                    if (isTradeMode && p.maxTrades <= 0 && p.minTrades <= 0) {
+                        simulatedDaysElapsed = dayIndex;
+                        targetReached = true;
+                        dailyStats.push({ wins: dailyWins, losses: dailyLosses, pnl: dailyProfit, tradeCount: dailyTradeCount });
+                        dailyBalance.push(balance > 0 ? balance : 0);
+                        dailyBalanceWithoutWithdrawals.push(balanceWithoutWithdrawals > 0 ? balanceWithoutWithdrawals : 0);
+                        break;
+                    }
+
                     const numTrades = p.minTrades + Math.floor(random() * (p.maxTrades - p.minTrades + 1));
                     if (numTrades > 0) {
                         activeTradingDaysCount++;
                     }
-                    
+
                     for (let j = 0; j < numTrades; j++) {
                         if (balance <= 0) break;
 
@@ -177,7 +192,12 @@ export function runSingleSimulation(p, simIndex) {
                             amount: tradeResult, cumulativeR, balanceAfter: balance > 0 ? balance : 0,
                             lotSize, stopLossInPips, commission: commissionCost
                         });
-                        
+
+                        if (isTradeMode && tradeTarget > 0 && totalTrades >= tradeTarget) {
+                            targetReached = true;
+                            break;
+                        }
+
                         // --- REVISED DAILY LIMIT LOGIC V2 ---
                         let limitHit = false;
                         let limitType = null;
@@ -214,8 +234,10 @@ export function runSingleSimulation(p, simIndex) {
                             });
                             break; // Exit the trade loop for the day
                         }
+
+                        if (targetReached) break;
                     } // End of daily trade loop
-                    
+
                     const dailyDdValue = startOfDayBalance - minBalanceDuringDay;
                     dailyDrawdowns.push({ dd: dailyDdValue, base: startOfDayBalance, dayIndex: dayIndex });
                 }
@@ -265,6 +287,9 @@ export function runSingleSimulation(p, simIndex) {
                 
                 dailyBalance.push(balance > 0 ? balance : 0);
                 dailyBalanceWithoutWithdrawals.push(balanceWithoutWithdrawals > 0 ? balanceWithoutWithdrawals : 0);
+
+                simulatedDaysElapsed = dayIndex;
+                if (targetReached) break;
             }
             // Final check for any ongoing streak at the end of the simulation
             if (consecutiveWins > 0) {
@@ -297,6 +322,7 @@ export function runSingleSimulation(p, simIndex) {
                 tradingDaysCount, activeTradingDaysCount, daysInDrawdown, daysInDdFromPeak, maxDdStreak,
                 totalR, totalWithdrawals,
                 maxConsecutiveWins, maxWinStreakDetails, maxConsecutiveLosses, maxLossStreakDetails,
-                slLimitHitCount, tpLimitHitCount, lossLimitHitCount, profitTargetHitCount
+                slLimitHitCount, tpLimitHitCount, lossLimitHitCount, profitTargetHitCount,
+                totalTradesSimulated: totalTrades, simulatedDays: simulatedDaysElapsed, tradeTarget, simulationMode: p.simulationMode
             };
         }

@@ -525,6 +525,29 @@
                             </h3>
                             <div class="space-y-6">
                                 <div class="input-group">
+                                    <label class="input-label">حالت شبیه‌سازی</label>
+                                    <div class="flex flex-col gap-2 bg-slate-800 p-3 rounded-lg border border-slate-700">
+                                        <label class="flex items-center gap-2">
+                                            <input type="radio" name="simulationMode" id="simulationModeTime" value="time" class="w-4 h-4 text-cyan-500 bg-slate-600 border-slate-500 focus:ring-cyan-600" checked>
+                                            <span>بر اساس بازه زمانی</span>
+                                        </label>
+                                        <label class="flex items-center gap-2">
+                                            <input type="radio" name="simulationMode" id="simulationModeTrades" value="trades" class="w-4 h-4 text-cyan-500 bg-slate-600 border-slate-500 focus:ring-cyan-600">
+                                            <span>بر اساس تعداد معاملات</span>
+                                        </label>
+                                        <p class="text-xs text-slate-400">در حالت معاملات، شبیه‌سازی تا رسیدن به تعداد معاملات هدف یا فعال شدن قوانین ریسک ادامه می‌یابد.</p>
+                                    </div>
+                                </div>
+                                <div id="tradeTargetGroup" class="input-group disabled">
+                                    <label class="input-label">تعداد معاملات هدف</label>
+                                    <input type="number" id="targetTrades" class="input-field" value="500" min="1" disabled>
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <input type="checkbox" id="showTradeTimeEstimate" class="w-4 h-4 text-cyan-500 bg-slate-600 rounded border-slate-500 focus:ring-cyan-600" disabled>
+                                        <label for="showTradeTimeEstimate" class="text-sm text-slate-400">نمایش تخمین زمان لازم بر اساس میانگین معاملات روزانه</label>
+                                    </div>
+                                    <div id="tradeTimeEstimate" class="text-sm text-slate-300 bg-slate-800 border border-slate-700 rounded-lg p-3 mt-2 hidden"></div>
+                                </div>
+                                <div class="input-group" id="durationGroup">
                                     <label class="input-label">مدت زمان شبیه‌سازی</label>
                                     <div class="flex gap-2 items-center">
                                         <input type="number" id="durationValue" class="input-field text-center" value="12">
