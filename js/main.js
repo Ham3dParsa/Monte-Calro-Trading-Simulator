@@ -126,6 +126,8 @@
     const rankingTableBodyEl = document.getElementById('ranking-table-body');
     const mainChartControls = document.getElementById('main-chart-controls');
     const singleChartControls = document.getElementById('single-chart-controls');
+    const mainResetZoomBtn = document.getElementById('main-reset-zoom');
+    const singleResetZoomBtn = document.getElementById('single-reset-zoom');
 
     const LS_PARAMS_KEY = 'tradingSimParams_v30_final';
 
@@ -478,6 +480,22 @@
     });
 
     showSingleSimBtn.addEventListener('click', showSingleSimView);
+    if (mainResetZoomBtn) {
+        mainResetZoomBtn.addEventListener('click', () => {
+            if (balanceChart && typeof balanceChart.resetZoom === 'function') {
+                balanceChart.resetZoom();
+                balanceChart.update('none');
+            }
+        });
+    }
+    if (singleResetZoomBtn) {
+        singleResetZoomBtn.addEventListener('click', () => {
+            if (singleSimChart && typeof singleSimChart.resetZoom === 'function') {
+                singleSimChart.resetZoom();
+                singleSimChart.update('none');
+            }
+        });
+    }
     singleSimChartTabs.addEventListener('click', (e) => {
         if (e.target.closest('.tab-btn')) {
             singleSimChartTabs.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -496,9 +514,9 @@
         if (controls.dataset.listenerAttached === 'true') return;
 
         // Set initial state based on default options
-        const panEnabled = chart.options.plugins.zoom.pan.enabled;
-        controls.querySelector('button[data-mode="pan"]').classList.toggle('active', panEnabled);
-        controls.querySelector('button[data-mode="zoom"]').classList.toggle('active', !panEnabled);
+        const dragZoomEnabled = chart.options.plugins.zoom.zoom.drag.enabled;
+        controls.querySelector('button[data-mode="pan"]').classList.toggle('active', !dragZoomEnabled);
+        controls.querySelector('button[data-mode="zoom"]').classList.toggle('active', dragZoomEnabled);
 
         controls.addEventListener('click', (e) => {
             const button = e.target.closest('button');
@@ -509,13 +527,8 @@
             controls.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
 
-            if (mode === 'pan') {
-                chart.options.plugins.zoom.pan.enabled = true;
-                chart.options.plugins.zoom.zoom.drag.enabled = false;
-            } else { // 'zoom'
-                chart.options.plugins.zoom.pan.enabled = false;
-                chart.options.plugins.zoom.zoom.drag.enabled = true;
-            }
+            chart.options.plugins.zoom.pan.enabled = true;
+            chart.options.plugins.zoom.zoom.drag.enabled = mode === 'zoom';
             chart.update('none');
         });
 

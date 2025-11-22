@@ -182,6 +182,9 @@
             overflow: hidden; /* Fix for unnecessary scrollbar */
             position: relative;
         }
+        .chart-panel canvas {
+            touch-action: none;
+        }
         .tab-btn.active {
             background-color: #0891b2;
             color: white;
@@ -688,6 +691,7 @@
                                 </div>
                                 <button id="scale-linear" class="btn btn-secondary btn-sm active">خطی</button>
                                 <button id="scale-log" class="btn btn-secondary btn-sm">لگاریتمی</button>
+                                <button id="main-reset-zoom" class="btn btn-secondary btn-sm">ریست زوم</button>
                                 <button class="fullscreen-btn btn btn-secondary btn-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5v4m0 0h-4" /></svg>
                                 </button>
@@ -773,6 +777,7 @@
                                 </div>
                                 <button id="single-scale-linear" class="btn btn-secondary btn-sm active">خطی</button>
                                 <button id="single-scale-log" class="btn btn-secondary btn-sm">لگاریتمی</button>
+                                <button id="single-reset-zoom" class="btn btn-secondary btn-sm">ریست زوم</button>
                                 <button class="fullscreen-btn btn btn-secondary btn-sm">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="icon-sm" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5v4m0 0h-4" /></svg>
                                 </button>
